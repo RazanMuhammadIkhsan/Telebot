@@ -139,6 +139,10 @@ app.post(`/api/bot/${mainBotToken}`, (req, res) => {
     mainBot.handleUpdate(req.body, res);
 });
 
+app.get('/api/ping', (req, res) => {
+  res.send('pong');
+});
+
 // Endpoint untuk form web
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, '../public/index.html'));
@@ -155,6 +159,6 @@ app.post('/submit-bot', async (req, res) => {
     }
 });
 
-
+const serverless = require('serverless-http');
 // Ekspor app untuk Vercel
-module.exports = app;
+module.exports = serverless(app);
