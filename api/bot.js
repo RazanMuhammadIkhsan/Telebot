@@ -24,8 +24,7 @@ if (!mainBotToken || !vercelUrl) {
 const mainBot = new Telegraf(mainBotToken);
 
 // Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf } }));
 
 
 // =================================================================
