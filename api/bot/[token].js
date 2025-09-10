@@ -1,68 +1,63 @@
 // api/bot/[token].js
 require('dotenv').config();
-const { Telegraf } = require('telegraf');
+const TelegramBot = require('node-telegram-bot-api'); // Library baru
 const { createClient } = require('@supabase/supabase-js');
 
+// Inisialisasi Klien Supabase
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 const vercelUrl = process.env.VERCEL_URL;
 
+// Fungsi untuk mendaftarkan bot (tidak berubah)
 async function registerBot(owner_number, bot_token) {
-    // Simpan ke Supabase
-    const { error: insertError } = await supabase
-        .from('bots')
-        .insert([{ owner_number, bot_token }]);
-
-    if (insertError) {
-        console.error('Error Supabase saat insert:', insertError);
-        throw new Error('Gagal menyimpan bot. Token mungkin sudah terdaftar.');
-    }
-
-    // Atur Webhook di Telegram
+    await supabase.from('bots').insert([{ owner_number, bot_token }]);
     const webhookUrl = `https://${vercelUrl}/api/webhook/${bot_token}`;
     const telegramApiUrl = `https://api.telegram.org/bot${bot_token}/setWebhook?url=${webhookUrl}`;
-
     const response = await fetch(telegramApiUrl);
     const result = await response.json();
-
     if (!result.ok) {
-        console.error('Gagal mengatur webhook:', result);
         throw new Error(`Gagal mengatur webhook: ${result.description}`);
     }
 }
 
+// Fungsi utama Serverless Vercel
 export default async function handler(request, response) {
-    // Pastikan hanya token bot utama yang bisa menggunakan endpoint ini
+    // Keamanan: Pastikan hanya token bot utama yang bisa menggunakan endpoint ini
     if (request.query.token !== process.env.BOT_TOKEN) {
         return response.status(401).send('Unauthorized');
     }
 
-    const bot = new Telegraf(process.env.BOT_TOKEN);
-
-    bot.start((ctx) => ctx.reply('Halo, saya bot utama. Gunakan /jadibot.'));
-    bot.command('jadibot', async (ctx) => {
-        const args = ctx.message.text.split(' ');
-        if (args.length !== 3) {
-            return ctx.reply('Format salah: /jadibot <owner_number> <bot_token>');
-        }
-        const [, owner_number, bot_token] = args;
-
-        try {
-            await ctx.reply('Memproses...');
-            await registerBot(owner_number, bot_token);
-            await ctx.reply('✅ Sukses! Bot clone Anda sekarang aktif.');
-        } catch (e) {
-            await ctx.reply(`❌ Gagal: ${e.message}`);
-        }
-    });
-
     try {
-        await bot.handleUpdate(request.body);
-    } catch (err) {
-        console.error(err);
-    }
+        const bot = new TelegramBot(process.env.BOT_TOKEN);
 
-    response.status(200).send('OK');
+        // Menangani perintah /start
+        bot.onText(/\/start/, (msg) => {
+            bot.sendMessage(msg.chat.id, 'Halo, saya bot utama. Gunakan /jadibot <owner> <token>.');
+        });
+
+        // Menangani perintah /jadibot dengan argumen
+        bot.onText(/\/jadibot (.+) (.+)/, async (msg, match) => {
+            const chatId = msg.chat.id;
+            const owner_number = match[1]; // Argumen pertama
+            const bot_token = match[2];    // Argumen kedua
+
+            try {
+                await bot.sendMessage(chatId, 'Memproses...');
+                await registerBot(owner_number, bot_token);
+                await bot.sendMessage(chatId, '✅ Sukses! Bot clone Anda sekarang aktif.');
+            } catch (e) {
+                await bot.sendMessage(chatId, `❌ Gagal: ${e.message}`);
+            }
+        });
+
+        // Memproses update dari webhook
+        bot.processUpdate(request.body);
+        response.status(200).send('OK');
+
+    } catch (error) {
+        console.error(error);
+        response.status(500).send('Internal Server Error');
+    }
 }

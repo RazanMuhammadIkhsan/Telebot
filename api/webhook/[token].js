@@ -1,53 +1,42 @@
 // api/webhook/[token].js
-const { Telegraf } = require('telegraf');
+const TelegramBot = require('node-telegram-bot-api'); // Library baru
 
-function setupClonedBotLogic(botInstance) {
-    botInstance.start(async (ctx) => {
-        console.log(`[CLONE DEBUG] Perintah /start diterima dari user: ${ctx.from.id}`);
-        try {
-            await ctx.reply('Halo! Saya bot clone. Gunakan /waifu.');
-            console.log(`[CLONE DEBUG] Balasan /start berhasil dikirim.`);
-        } catch (error) {
-            console.error('[CLONE ERROR] GAGAL MENGIRIM BALASAN /start:', error);
-        }
-    });
-
-    botInstance.command('waifu', async (ctx) => {
-        console.log(`[CLONE DEBUG] Perintah /waifu diterima dari user: ${ctx.from.id}`);
-        try {
-            const response = await fetch('https://api.waifu.pics/sfw/waifu');
-            const data = await response.json();
-            await ctx.replyWithPhoto(data.url, { caption: 'Waifu untukmu! ✨' });
-            console.log(`[CLONE DEBUG] Balasan /waifu berhasil dikirim.`);
-        } catch (error) {
-            console.error('[CLONE ERROR] GAGAL MENGIRIM BALASAN /waifu:', error);
-            try {
-                // Jika kirim foto gagal, coba kirim pesan teks error
-                await ctx.reply('Maaf, terjadi kesalahan saat mencari waifu.');
-            } catch (replyError) {
-                console.error('[CLONE ERROR] Bahkan gagal mengirim pesan error teks:', replyError);
-            }
-        }
-    });
-}
-
+// Fungsi utama Serverless Vercel
 export default async function handler(request, response) {
+    // Pengecekan dasar, jika request bukan POST atau tidak ada body
     if (request.method !== 'POST' || !request.body) {
         return response.status(200).send('This is a webhook endpoint for a Telegram bot.');
     }
 
-    const token = request.query.token;
-    console.log(`[CLONE DEBUG] Menerima request untuk token: ...${token.slice(-6)}`);
-    const bot = new Telegraf(token);
-    
-    setupClonedBotLogic(bot);
-    
     try {
-        await bot.handleUpdate(request.body);
-    } catch (err) {
-        // Ini jarang terjadi, tapi untuk jaga-jaga
-        console.error('[CLONE FATAL ERROR] Error di handleUpdate:', err);
+        const token = request.query.token;
+        const bot = new TelegramBot(token);
+
+        // Menangani perintah /start
+        bot.onText(/\/start/, (msg) => {
+            bot.sendMessage(msg.chat.id, 'Halo! Saya bot clone. Gunakan /waifu.');
+        });
+        
+        // Menangani perintah /waifu
+        bot.onText(/\/waifu/, async (msg) => {
+            const chatId = msg.chat.id;
+            try {
+                const apiResponse = await fetch('https://api.waifu.pics/sfw/waifu');
+                const data = await apiResponse.json();
+                // Mengirim foto dengan library baru
+                await bot.sendPhoto(chatId, data.url, { caption: 'Waifu untukmu! ✨' });
+            } catch (error) {
+                console.error("Gagal kirim /waifu:", error);
+                await bot.sendMessage(chatId, 'Maaf, gagal mengambil gambar waifu.');
+            }
+        });
+
+        // Memproses update dari webhook
+        bot.processUpdate(request.body);
+        response.status(200).send('OK');
+
+    } catch (error) {
+        console.error(error);
+        response.status(500).send('Internal Server Error');
     }
-    
-    response.status(200).send('OK');
 }
