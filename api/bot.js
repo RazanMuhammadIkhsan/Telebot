@@ -50,14 +50,10 @@ function setupClonedBotLogic(botInstance) {
 }
 
 
-// =================================================================
-// BAGIAN 2: ENDPOINT UNTUK MENERIMA PESAN DARI SEMUA BOT CLONE
-// =================================================================
-// Ini adalah endpoint "Manajer" kita. Semua bot clone akan mengirim pesan ke sini.
 app.post('/api/webhook/:token', async (req, res) => {
     const token = req.params.token;
 
-    // Keamanan: Cek apakah token ada di database kita sebelum memproses
+    /* // --- NONAKTIFKAN SEMENTARA UNTUK TES ---
     const { data, error } = await supabase
         .from('bots')
         .select('bot_token')
@@ -68,6 +64,7 @@ app.post('/api/webhook/:token', async (req, res) => {
         console.warn(`Menerima request untuk token tidak dikenal: ${token}`);
         return res.status(401).send('Token tidak sah');
     }
+    */
 
     // Buat instance bot on-the-fly (saat itu juga) menggunakan token dari URL
     const clonedBot = new Telegraf(token);
