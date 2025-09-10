@@ -141,7 +141,7 @@ app.post(`/api/bot/${mainBotToken}`, (req, res) => {
 
 // Endpoint untuk form web
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, '../../public/index.html'));
+    res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
 // Endpoint untuk menerima data dari form web
